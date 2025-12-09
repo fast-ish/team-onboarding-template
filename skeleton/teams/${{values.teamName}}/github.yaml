@@ -1,0 +1,25 @@
+{%- if values.enableGitHub %}
+# GitHub Team Configuration
+# Terraform reads this ConfigMap to create the GitHub team
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${{ values.teamName }}-github
+  namespace: team-${{ values.teamName }}
+  labels:
+    fasti.sh/team: ${{ values.teamName }}
+  annotations:
+    fasti.sh/managed-by: terraform
+data:
+  team_name: ${{ values.teamName }}
+  team_description: "${{ values.teamDescription }}"
+  privacy: closed
+  parent_team: engineering
+  members: |
+    ${{ values.teamLead }}
+{%- for member in values.teamMembers %}
+    ${{ member }}
+{%- endfor %}
+  # Repos matching this pattern will be accessible to the team
+  repo_pattern: "${{ values.teamName }}-*"
+{%- endif %}

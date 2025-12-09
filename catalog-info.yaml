@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Template
+metadata:
+  name: team-onboarding
+  title: Onboard New Team
+  description: Creates a new team namespace with RBAC, quotas, network policies, and observability
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - team
+    - onboarding
+    - platform
+    - golden-path
+spec:
+  type: team
+  lifecycle: production
+  owner: platform

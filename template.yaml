@@ -1,0 +1,272 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: team-onboarding
+  title: Onboard New Team
+  description: Creates a new team namespace with RBAC, quotas, network policies, and observability
+  tags:
+    - team
+    - onboarding
+    - platform
+    - golden-path
+spec:
+  owner: platform
+  type: team
+
+  parameters:
+    - title: Team Information
+      required:
+        - teamName
+        - teamAlias
+        - teamDescription
+        - costCenter
+      properties:
+        teamName:
+          title: Team Name
+          type: string
+          description: Full team name (lowercase, alphanumeric, hyphens only)
+          pattern: '^[a-z][a-z0-9-]*$'
+          ui:autofocus: true
+        teamAlias:
+          title: Team Alias
+          type: string
+          description: Short alias for the team (2-4 characters)
+          pattern: '^[a-z]{2,4}$'
+          maxLength: 4
+          minLength: 2
+        teamDescription:
+          title: Team Description
+          type: string
+          description: Brief description of the team's purpose
+        costCenter:
+          title: Cost Center
+          type: string
+          description: Cost center code for billing
+          pattern: '^[A-Z]{2}-[0-9]{4}$'
+          ui:help: 'Format: XX-0000 (e.g., EN-1234)'
+        slackChannel:
+          title: Slack Channel
+          type: string
+          description: Team Slack channel for notifications (without #)
+          pattern: '^[a-z0-9-]+$'
+        oncallSchedule:
+          title: PagerDuty Schedule
+          type: string
+          description: PagerDuty schedule ID for on-call routing
+
+    - title: Resource Quotas
+      properties:
+        tier:
+          title: Resource Tier
+          type: string
+          description: Predefined resource tier
+          default: standard
+          enum:
+            - starter
+            - standard
+            - large
+            - enterprise
+          enumNames:
+            - 'Starter (4 CPU, 8Gi, 20 pods)'
+            - 'Standard (10 CPU, 20Gi, 50 pods)'
+            - 'Large (20 CPU, 40Gi, 100 pods)'
+            - 'Enterprise (40 CPU, 80Gi, 200 pods)'
+        customQuotas:
+          title: Custom Quotas
+          type: boolean
+          default: false
+          description: Override tier with custom values
+        cpuQuota:
+          title: CPU Quota (cores)
+          type: string
+          default: "10"
+          description: Maximum CPU cores for the team namespace
+          ui:widget: hidden
+          ui:options:
+            hidden:
+              $ne:
+                - field: customQuotas
+                  value: true
+        memoryQuota:
+          title: Memory Quota
+          type: string
+          default: "20Gi"
+          description: Maximum memory for the team namespace
+          ui:widget: hidden
+          ui:options:
+            hidden:
+              $ne:
+                - field: customQuotas
+                  value: true
+        podQuota:
+          title: Pod Quota
+          type: integer
+          default: 50
+          description: Maximum number of pods
+          ui:widget: hidden
+          ui:options:
+            hidden:
+              $ne:
+                - field: customQuotas
+                  value: true
+
+    - title: Team Members
+      required:
+        - teamLead
+      properties:
+        teamLead:
+          title: Team Lead
+          type: string
+          description: GitHub username of the team lead
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: User
+        teamMembers:
+          title: Team Members
+          type: array
+          description: GitHub usernames of team members
+          items:
+            type: string
+            ui:field: OwnerPicker
+            ui:options:
+              catalogFilter:
+                kind: User
+
+    - title: Integrations
+      properties:
+        enableGrafana:
+          title: Enable Grafana Integration
+          type: boolean
+          default: true
+          description: Create Grafana team and dashboards
+        enableAwsAccess:
+          title: Enable AWS Access
+          type: boolean
+          default: true
+          description: Create IAM roles for IRSA
+        enableGitHub:
+          title: Enable GitHub Team
+          type: boolean
+          default: true
+          description: Create GitHub team with repo access
+        enableEcr:
+          title: Enable ECR Repository
+          type: boolean
+          default: true
+          description: Create ECR repository for container images
+        environments:
+          title: Environments
+          type: array
+          description: Environments to create (dev is always included)
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - staging
+              - production
+          default:
+            - staging
+            - production
+
+  steps:
+    - id: fetch-skeleton
+      name: Fetch Team Skeleton
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          teamName: ${{ parameters.teamName }}
+          teamAlias: ${{ parameters.teamAlias }}
+          teamDescription: ${{ parameters.teamDescription }}
+          costCenter: ${{ parameters.costCenter }}
+          slackChannel: ${{ parameters.slackChannel }}
+          oncallSchedule: ${{ parameters.oncallSchedule }}
+          tier: ${{ parameters.tier }}
+          customQuotas: ${{ parameters.customQuotas }}
+          cpuQuota: ${{ parameters.cpuQuota }}
+          memoryQuota: ${{ parameters.memoryQuota }}
+          podQuota: ${{ parameters.podQuota }}
+          teamLead: ${{ parameters.teamLead }}
+          teamMembers: ${{ parameters.teamMembers }}
+          enableGrafana: ${{ parameters.enableGrafana }}
+          enableAwsAccess: ${{ parameters.enableAwsAccess }}
+          enableGitHub: ${{ parameters.enableGitHub }}
+          enableEcr: ${{ parameters.enableEcr }}
+          environments: ${{ parameters.environments }}
+
+    - id: create-pull-request
+      name: Create Pull Request to GitOps Repo
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?owner=fast-ish&repo=aws-idp-gitops
+        branchName: onboard-team-${{ parameters.teamName }}
+        title: "onboard team: ${{ parameters.teamName }}"
+        description: |
+          ## Team Onboarding Request
+
+          This PR creates the following resources for team **${{ parameters.teamName }}**:
+
+          ### Kubernetes Resources
+          - Namespace: `team-${{ parameters.teamName }}`
+          - ResourceQuota based on tier: `${{ parameters.tier }}`
+          - LimitRange with default container limits
+          - NetworkPolicy for namespace isolation
+          - RBAC roles (developer, viewer)
+          - ServiceAccount for workloads
+
+          ### ArgoCD
+          - AppProject with team-scoped permissions
+          - Developer and viewer roles
+
+          ### Secrets Management
+          - ExternalSecrets SecretStore (AWS Secrets Manager)
+          - ExternalSecrets SecretStore (AWS Parameter Store)
+
+          ### Backstage Catalog
+          - Team entity in Backstage catalog
+          - Team members and ownership
+
+          {%- if parameters.enableGrafana %}
+          ### Observability
+          - Grafana team configuration
+          - Default dashboards and alerts
+          {%- endif %}
+
+          {%- if parameters.enableAwsAccess %}
+          ### AWS Access
+          - IAM role for IRSA
+          - Base policies for team workloads
+          {%- endif %}
+
+          {%- if parameters.enableGitHub %}
+          ### GitHub
+          - GitHub team: `${{ parameters.teamName }}`
+          - Repo naming convention: `${{ parameters.teamName }}-*`
+          {%- endif %}
+
+          {%- if parameters.enableEcr %}
+          ### Container Registry
+          - ECR repository prefix: `team-${{ parameters.teamName }}`
+          - Image lifecycle policy (keep last 30)
+          {%- endif %}
+
+          ### Team Details
+          | Property | Value |
+          |----------|-------|
+          | **Alias** | ${{ parameters.teamAlias }} |
+          | **Cost Center** | ${{ parameters.costCenter }} |
+          | **Team Lead** | @${{ parameters.teamLead }} |
+          | **Environments** | ${{ parameters.environments | join(", ") }} |
+
+          ---
+          *Created via Backstage Team Onboarding Template*
+
+  output:
+    links:
+      - title: View Pull Request
+        url: ${{ steps['create-pull-request'].output.remoteUrl }}
+      - title: GitOps Repository
+        url: https://github.com/fast-ish/aws-idp-gitops
+      - title: Team Documentation
+        url: https://backstage.yourcompany.com/docs/default/component/team-onboarding
