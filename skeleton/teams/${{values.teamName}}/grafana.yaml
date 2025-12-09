@@ -1,0 +1,16 @@
+# Grafana Team Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${{ values.teamName }}-grafana
+  namespace: team-${{ values.teamName }}
+  labels:
+    fasti.sh/team: ${{ values.teamName }}
+  annotations:
+    fasti.sh/managed-by: terraform
+data:
+  team: ${{ values.teamName }}
+  env: "${ENVIRONMENT}"
+  service_tags: |
+    team:${{ values.teamName }}
+    cost-center:${{ values.costCenter }}

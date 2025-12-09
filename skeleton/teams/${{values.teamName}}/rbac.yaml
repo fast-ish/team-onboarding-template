@@ -1,0 +1,83 @@
+# Developer Role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ${{ values.teamName }}-developer
+  namespace: team-${{ values.teamName }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/exec", "pods/portforward", "services", "endpoints", "configmaps", "secrets", "persistentvolumeclaims", "events"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+# Viewer Role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ${{ values.teamName }}-viewer
+  namespace: team-${{ values.teamName }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "services", "endpoints", "configmaps", "persistentvolumeclaims", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+
+---
+# Role Binding - Team Lead
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ${{ values.teamName }}-lead-binding
+  namespace: team-${{ values.teamName }}
+subjects:
+  - kind: User
+    name: ${{ values.teamLead }}
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: ${{ values.teamName }}-developer
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Role Binding - Team Members
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ${{ values.teamName }}-members-binding
+  namespace: team-${{ values.teamName }}
+subjects:
+{%- for member in values.teamMembers %}
+  - kind: User
+    name: ${{ member }}
+    apiGroup: rbac.authorization.k8s.io
+{%- endfor %}
+roleRef:
+  kind: Role
+  name: ${{ values.teamName }}-developer
+  apiGroup: rbac.authorization.k8s.io

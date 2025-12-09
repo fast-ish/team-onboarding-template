@@ -1,0 +1,25 @@
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: ${{ values.teamName }}
+  description: ${{ values.teamDescription }}
+  annotations:
+    backstage.io/managed-by-location: url:https://github.com/fast-ish/aws-idp-gitops/blob/main/teams/${{ values.teamName }}/backstage.yaml
+    {%- if values.slackChannel %}
+    slack.com/channel: ${{ values.slackChannel }}
+    {%- endif %}
+    {%- if values.oncallSchedule %}
+    pagerduty.com/schedule-id: ${{ values.oncallSchedule }}
+    {%- endif %}
+  labels:
+    fasti.sh/cost-center: ${{ values.costCenter }}
+spec:
+  type: team
+  profile:
+    displayName: ${{ values.teamName | title }}
+  children: []
+  members:
+    - ${{ values.teamLead }}
+{%- for member in values.teamMembers %}
+    - ${{ member }}
+{%- endfor %}

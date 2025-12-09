@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: ${{ values.teamName }}-quota
+  namespace: team-${{ values.teamName }}
+spec:
+  hard:
+{%- if values.customQuotas %}
+    requests.cpu: "${{ values.cpuQuota }}"
+    requests.memory: ${{ values.memoryQuota }}
+    limits.cpu: "${{ values.cpuQuota }}"
+    limits.memory: ${{ values.memoryQuota }}
+    pods: "${{ values.podQuota }}"
+{%- elif values.tier == "starter" %}
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "4"
+    limits.memory: 8Gi
+    pods: "20"
+{%- elif values.tier == "large" %}
+    requests.cpu: "20"
+    requests.memory: 40Gi
+    limits.cpu: "20"
+    limits.memory: 40Gi
+    pods: "100"
+{%- elif values.tier == "enterprise" %}
+    requests.cpu: "40"
+    requests.memory: 80Gi
+    limits.cpu: "40"
+    limits.memory: 80Gi
+    pods: "200"
+{%- else %}
+    requests.cpu: "10"
+    requests.memory: 20Gi
+    limits.cpu: "10"
+    limits.memory: 20Gi
+    pods: "50"
+{%- endif %}
+    services: "20"
+    configmaps: "50"
+    secrets: "50"
+    persistentvolumeclaims: "10"

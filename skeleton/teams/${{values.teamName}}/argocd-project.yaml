@@ -1,0 +1,90 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ${{ values.teamName }}
+  namespace: argocd
+  labels:
+    fasti.sh/team: ${{ values.teamName }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: "ArgoCD project for team ${{ values.teamName }}"
+
+  # Only allow deploying to team namespace
+  destinations:
+    - namespace: team-${{ values.teamName }}
+      server: https://kubernetes.default.svc
+
+  # Only allow sourcing from team's repos
+  sourceRepos:
+    - "https://github.com/fast-ish/${{ values.teamName }}-*"
+    - "https://github.com/fast-ish/aws-idp-gitops"
+
+  # Allow all cluster-scoped resources typical for apps
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  # Allow common namespaced resources
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: Secret
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: ""
+      kind: PersistentVolumeClaim
+    - group: apps
+      kind: Deployment
+    - group: apps
+      kind: StatefulSet
+    - group: apps
+      kind: DaemonSet
+    - group: apps
+      kind: ReplicaSet
+    - group: batch
+      kind: Job
+    - group: batch
+      kind: CronJob
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+    - group: policy
+      kind: PodDisruptionBudget
+    - group: external-secrets.io
+      kind: ExternalSecret
+
+  # Deny resources that could affect other teams
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
+    - group: rbac.authorization.k8s.io
+      kind: Role
+    - group: rbac.authorization.k8s.io
+      kind: RoleBinding
+
+  # Team roles for ArgoCD access
+  roles:
+    - name: developer
+      description: "Developer access for team ${{ values.teamName }}"
+      policies:
+        - p, proj:${{ values.teamName }}:developer, applications, get, ${{ values.teamName }}/*, allow
+        - p, proj:${{ values.teamName }}:developer, applications, sync, ${{ values.teamName }}/*, allow
+        - p, proj:${{ values.teamName }}:developer, applications, action/*, ${{ values.teamName }}/*, allow
+        - p, proj:${{ values.teamName }}:developer, logs, get, ${{ values.teamName }}/*, allow
+      groups:
+        - ${{ values.teamName }}
+
+    - name: viewer
+      description: "Read-only access for team ${{ values.teamName }}"
+      policies:
+        - p, proj:${{ values.teamName }}:viewer, applications, get, ${{ values.teamName }}/*, allow
+        - p, proj:${{ values.teamName }}:viewer, logs, get, ${{ values.teamName }}/*, allow

@@ -1,0 +1,72 @@
+{%- if values.enableEcr %}
+# ECR Repository Configuration
+# Terraform reads this ConfigMap to create the ECR repository
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${{ values.teamName }}-ecr
+  namespace: team-${{ values.teamName }}
+  labels:
+    fasti.sh/team: ${{ values.teamName }}
+  annotations:
+    fasti.sh/managed-by: terraform
+data:
+  repository_prefix: team-${{ values.teamName }}
+  image_tag_mutability: MUTABLE
+  scan_on_push: "true"
+  # Lifecycle policy - keep last 30 images
+  lifecycle_policy: |
+    {
+      "rules": [
+        {
+          "rulePriority": 1,
+          "description": "Keep last 30 images",
+          "selection": {
+            "tagStatus": "any",
+            "countType": "imageCountMoreThan",
+            "countNumber": 30
+          },
+          "action": {
+            "type": "expire"
+          }
+        }
+      ]
+    }
+
+---
+# ECR Pull Secret via ExternalSecrets
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: ${{ values.teamName }}-ecr-credentials
+  namespace: team-${{ values.teamName }}
+  labels:
+    fasti.sh/team: ${{ values.teamName }}
+spec:
+  refreshInterval: 12h
+  secretStoreRef:
+    name: ${{ values.teamName }}-aws-secrets
+    kind: SecretStore
+  target:
+    name: ${{ values.teamName }}-ecr-credentials
+    template:
+      type: kubernetes.io/dockerconfigjson
+      data:
+        .dockerconfigjson: |
+          {
+            "auths": {
+              "{{ `{{ .registry }}` }}": {
+                "auth": "{{ `{{ .auth }}` }}"
+              }
+            }
+          }
+  data:
+    - secretKey: registry
+      remoteRef:
+        key: team/${{ values.teamName }}/ecr
+        property: registry
+    - secretKey: auth
+      remoteRef:
+        key: team/${{ values.teamName }}/ecr
+        property: auth
+{%- endif %}
